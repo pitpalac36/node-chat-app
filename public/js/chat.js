@@ -14,10 +14,42 @@ const $messages = document.querySelector('#messages')
 // Templates
 const messageTemplate = document.querySelector('#message-template').innerHTML
 const locationTemplate = document.querySelector('#url-template').innerHTML
+const sidebarTemplate = document.querySelector('#sidebar-template').innerHTML
 
 // Options
 // ignoreQueryPrefix true -> make sure the question mark goes away 
 const { username, room } = Qs.parse(location.search, { ignoreQueryPrefix : true })
+
+
+/* will be called after rendering messages and after rendering location
+   scroll down if user is following the latest messages; 
+   if user is digging through chat history then new messages won't trigger autoscroll
+*/
+const autoscroll = () => {
+    // new message element
+    const $newMessage = messages.lastElementChild
+
+    // height of $newMessage
+    const newMessageStyles = getComputedStyle($newMessage)
+    const newMessageMargin = parseInt(newMessageStyles.marginBottom)
+
+    // total height (margin taken into account)
+    const newMessageHeight = $newMessage.offsetHeight + newMessageMargin
+
+    // visible heigth
+    const visibleHeigth = $messages.offsetHeight
+
+    // height of messages container
+    const containerHeight = $messages.scrollHeight
+
+    // how far have I scrolled
+    const scrollOffset = $messages.scrollTop + visibleHeigth
+
+    // if user was at the bottom before the last message
+    if (containerHeight - newMessageHeight <= scrollOffset) {
+        $messages.scrollTop = $messages.scrollHeight
+    }
+}
 
 socket.on('message', (message) => {
     const html = Mustache.render(messageTemplate, {
@@ -26,6 +58,7 @@ socket.on('message', (message) => {
         createdAt: moment(message.createdAt).format('h:mm a')     // formatting timestamp with momentjs (hour:minutes AM/PM)
     })
     $messages.insertAdjacentHTML('beforeend', html)
+    autoscroll()
 })
 
 
@@ -36,6 +69,15 @@ socket.on('locationMessage', (message) => {
         createdAt : moment(message.createdAt).format('h:mm a')
     })
     $messages.insertAdjacentHTML('beforeend', html)
+    autoscroll()
+})
+
+socket.on('roomData', ({ room, users }) => {
+    const html = Mustache.render(sidebarTemplate, {
+        room,
+        users
+    })
+    document.querySelector('#sidebar').innerHTML = html
 })
 
 
@@ -55,7 +97,7 @@ $messageForm.addEventListener('submit', (e) => {
         $messageFormInput.focus()
 
         if (error) {
-            return console.log(error)
+            return alert(error)
         }
         console.log('Message delivered!')
     })
